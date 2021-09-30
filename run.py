@@ -30,19 +30,18 @@ torch.set_grad_enabled(False) # make sure to not compute gradients for computati
 
 torch.backends.cudnn.enabled = True # make sure to use cudnn for computational performance
 
+arguments_strModel = 'default' # 'default', or 'kitti', or 'sintel'
+
 ##########################################################
 
-arguments_strModel = 'default' # 'default', or 'kitti', or 'sintel'
-arguments_strOne = './images/one.png'
-arguments_strTwo = './images/two.png'
-arguments_strOut = './out.flo'
+def parser():
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--source', type=str, default=ROOT / 'data/images', help='file/dir')
+	parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
+	parser.add_argument('--save-img', action='store_true', help='Save flow')
+	args = parser.parse_args()
 
-for strOption, strArgument in getopt.getopt(sys.argv[1:], '', [ strParameter[2:] + '=' for strParameter in sys.argv[1::2] ])[0]:
-	if strOption == '--model' and strArgument != '': arguments_strModel = strArgument # which model to use
-	if strOption == '--one' and strArgument != '': arguments_strOne = strArgument # path to the first frame
-	if strOption == '--two' and strArgument != '': arguments_strTwo = strArgument # path to the second frame
-	if strOption == '--out' and strArgument != '': arguments_strOut = strArgument # path to where the output should be stored
-# end
+	return args
 
 ##########################################################
 
@@ -390,15 +389,16 @@ def estimate(model, tenOne, tenTwo):
 ##########################################################
 
 
-def run(device='0',
-		source='data/images',  # file/dir/URL/glob, 0 for webcam
-        project='runs/detect',  # save results to project/name
-        name='exp',  # save results to project/name
-		save_txt=True,
-		half=False,
-		imgsz=1920,
-		save_img=False
-		):
+def run(opt):
+	device='0'
+	source=opt.source  # file/dir/URL/glob, 0 for webcam
+	project='runs/detect'  # save results to project/name
+	name='exp'  # save results to project/name
+	save_txt=True
+	half=False
+	imgsz=opt.imgsz[0]
+	save_img=opt.save_img
+
 
     # Directories
 	save_dir = increment_path(Path(project) / name, exist_ok=False)  # increment run
@@ -465,8 +465,14 @@ def run(device='0',
 						fps = vid_cap.get(cv2.CAP_PROP_FPS)
 						w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 						h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+						#w = tenOutput.shape[2]
+						#h = tenOutput.shape[1]
+						alpha = 0.6
+						#im0s = cv2.addWeighted(flow_img, alpha, im0s, 1 - alpha, 0)
 					vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-				vid_writer[i].write(flow_to_color(tenOutput, convert_to_bgr=False))
+				flow_img = flow_to_color(tenOutput.numpy().transpose(1, 2, 0), convert_to_bgr=False)
+				flow_img = cv2.resize(flow_img, dsize=(w, h))
+				vid_writer[i].write(cv2.addWeighted(flow_img, alpha, im0s, 1 - alpha, 0))
 		
 
     	# Print results
@@ -476,8 +482,6 @@ def run(device='0',
 
 
 if __name__ == '__main__':
+	parse = parser()
 
-	tenOne = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strOne))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
-	tenTwo = torch.FloatTensor(numpy.ascontiguousarray(numpy.array(PIL.Image.open(arguments_strTwo))[:, :, ::-1].transpose(2, 0, 1).astype(numpy.float32) * (1.0 / 255.0)))
-
-	run(device='0', source='/home/ayden/VIPData/Test_Data/5p3b.m4v')
+	run(parse)
