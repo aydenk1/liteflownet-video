@@ -38,7 +38,10 @@ def parser():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--source', type=str, default=ROOT / 'data/images', help='file/dir')
 	parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
-	parser.add_argument('--save-img', action='store_true', help='Save flow')
+	parser.add_argument('--save-img', action='store_true', help='Save flow images or video')
+	parser.add_argument('--use-input-name', action='store_true', help='Use input folder name for .flo output folder')
+	parser.add_argument('--visdrone', action='store_true', help='Get all flow sequences from visdrone MOT dataset')
+	parser.add_argument('--project', type=str, default='runs/detect', help='project name')
 	args = parser.parse_args()
 
 	return args
@@ -392,17 +395,28 @@ def estimate(model, tenOne, tenTwo):
 def run(opt):
 	device='0'
 	source=opt.source  # file/dir/URL/glob, 0 for webcam
-	project='runs/detect'  # save results to project/name
+	project=opt.project  # save results to project/name
 	name='exp'  # save results to project/name
 	save_txt=True
 	half=False
 	imgsz=opt.imgsz[0]
 	save_img=opt.save_img
+	usein=opt.use_input_name
 
+
+	
 
     # Directories
+	if(usein):
+		path = os.path.normpath(source)
+		path = path.split(os.sep)
+		name = str(path[-1])
+	
 	save_dir = increment_path(Path(project) / name, exist_ok=False)  # increment run
-	(save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+	if(usein):
+		(save_dir if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+	else:
+		(save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
 
 	half &= device != 'cpu'  # half precision only supported on CUDA
@@ -440,9 +454,16 @@ def run(opt):
 
 		tenOutput = estimate(model, prev_img, curr_img)
 
+		 
+
 		p = Path(path)  # to Path
 		save_path = str(save_dir / p.name) 
-		txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_00{frame_num}.flo')  # img.txt
+		if(usein):
+			txt_path = str(save_dir / p.stem) + ('.flo' if dataset.mode == 'image' else f'_00{frame_num}.flo')  # img.flo
+		else:	
+			txt_path = str(save_dir / 'labels' / p.stem) + ('.flo' if dataset.mode == 'image' else f'_00{frame_num}.flo')  # img.flo
+
+
 		if save_txt:  # Write to file
 			with open(txt_path, 'wb') as f:
 				numpy.array([ 80, 73, 69, 72 ], numpy.uint8).tofile(f)
@@ -484,4 +505,23 @@ def run(opt):
 if __name__ == '__main__':
 	parse = parser()
 
-	run(parse)
+	if (parse.visdrone):
+		seq_path = parse.source
+		folders= [os.path.join(seq_path, name) for name in os.listdir(seq_path) if os.path.isdir(os.path.join(seq_path, name))]
+
+		for dir in folders:
+			parse.source = dir
+
+			if "train" in parse.source:
+				parse.project = 'runs/visdrone_MOT_train'
+			elif "val" in parse.source:
+				parse.project = 'runs/visdrone_MOT_val'
+			elif "test-challenge" in parse.source:
+				parse.project = 'runs/visdrone_MOT_test-challenge'
+			elif "test-dev" in parse.source:
+				parse.project = 'runs/visdrone_MOT_test-dev'
+
+			run(parse)
+		
+	else:
+		run(parse)

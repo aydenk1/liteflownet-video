@@ -8,9 +8,9 @@
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "./run.py",
             "console": "integratedTerminal",
-            "args": ["--source", "/home/ayden/VIPData/Test_Data/5p4b.m4v", "--save-img"]
+            "args": ["--source", "/home/ayden/Repos/VisDrone2019-MOT-train/sequences", "--use-input-name", "--visdrone"]
         }
     ]
 }
